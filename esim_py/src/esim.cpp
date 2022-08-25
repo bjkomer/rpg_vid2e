@@ -135,6 +135,42 @@ Eigen::MatrixXd EventSimulator::generateFromFolder(std::string image_folder, std
     return vec_to_eigen_matrix(events_vec);
 }
 
+Eigen::MatrixXd EventSimulator::generateFromArray(std::vector<Eigen::MatrixXd> images, std::vector<double> timestamps)
+{
+    // check that timestamps are ascending
+    if (images.size() != timestamps.size())
+        throw std::runtime_error("Number of images and number of timestamps should be equal. Got " + std::to_string(images.size()) + " and " + std::to_string(timestamps.size()));
+
+    cv::Mat img, log_img;
+    double time;
+
+    std::vector<Event> events_vec;
+
+    for (int i=0; i<timestamps.size(); i++)
+    {
+        if ((i < timestamps.size()-1)  && timestamps[i+1]<timestamps[i])
+            throw std::runtime_error("Timestamps must be sorted in ascending order.");
+
+        cv::eigen2cv(images[i], img);
+
+        if(img.empty())
+            throw std::runtime_error("unable to convert image to grayscale");
+
+        img.convertTo(img, CV_32F, 1.0/255);
+        cv::Mat log_img = img;
+        if (use_log_img_)
+            cv::log(img+log_eps_, log_img);
+
+        time = timestamps[i];
+
+        imageCallback(log_img, time, events_vec);
+    }
+
+    // reset state to generate new events
+    is_initialized_ = false;
+
+    return vec_to_eigen_matrix(events_vec);
+}
 
 void EventSimulator::init(const cv::Mat &img, double time)
 {

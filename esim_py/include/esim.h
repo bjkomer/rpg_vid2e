@@ -45,6 +45,7 @@ public:
   Eigen::MatrixXd generateFromFolder(std::string image_folder, std::string timestamps_file_path);
   Eigen::MatrixXd generateFromVideo(std::string video_path, std::string timestamps_file_path);
   Eigen::MatrixXd generateFromStampedImageSequence(std::vector<std::string> image_paths, std::vector<double> timestamps);
+  Eigen::MatrixXd generateFromArray(std::vector<Eigen::MatrixXd> images, std::vector<double> timestamps);
 
   void setParameters(float contrast_threshold_pos, 
                      float contrast_threshold_neg,

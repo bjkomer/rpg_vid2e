@@ -11,6 +11,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import cv2
 import time
 
 
@@ -26,13 +27,13 @@ def viz_events(events, resolution):
 
     image_rgb = np.stack(
         [
-            image_pos.reshape(resolution), 
-            image_neg.reshape(resolution), 
-            np.zeros(resolution, dtype="uint8") 
+            image_pos.reshape(resolution),
+            image_neg.reshape(resolution),
+            np.zeros(resolution, dtype="uint8")
         ], -1
     ) * 50
 
-    return image_rgb    
+    return image_rgb
 
 
 Cp, Cn = 0.1, 0.1
@@ -45,13 +46,28 @@ image_folder = os.path.join(os.path.dirname(__file__), "data/images/images/")
 timestamps_file = os.path.join(os.path.dirname(__file__), "data/images/timestamps.txt")
 video_file = os.path.join(os.path.dirname(__file__), "data/video/video.avi")
 
-esim = esim_py.EventSimulator(Cp, 
-                              Cn, 
-                              refractory_period, 
-                              log_eps, 
+timestamps = np.array([float(x) for x in open(timestamps_file, "r").readlines()])
+
+n_samples = len(timestamps)
+
+# Read images into a list of numpy arrays
+images = []
+for i in range(n_samples):
+
+    image_file = os.path.join(image_folder, f"image_{i:05d}.png")
+    # Load image and convert to grayscale
+    image = cv2.imread(image_file, cv2.IMREAD_GRAYSCALE)
+
+    images.append(image)
+
+
+esim = esim_py.EventSimulator(Cp,
+                              Cn,
+                              refractory_period,
+                              log_eps,
                               use_log)
 
-fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(6,6))
+fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(6, 6))
 
 contrast_thresholds_pos = [0.1, 0.2, 0.3, 0.4, 0.5]
 contrast_thresholds_neg = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -60,19 +76,32 @@ refractory_periods = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
 num_events_plot = 30000
 start = time.time()
 
+matches = 0
+total = 0
+
 for i, Cp in enumerate(contrast_thresholds_pos):
     for j, Cn in enumerate(contrast_thresholds_neg):
         esim.setParameters(Cp, Cn, refractory_period, log_eps, use_log)
-        events = esim.generateFromFolder(image_folder, timestamps_file)
-        
-        image_rgb = viz_events(events[:num_events_plot], [H, W])
+        events_array = esim.generateFromArray(images, timestamps)
+        events_folder = esim.generateFromFolder(image_folder, timestamps_file)
 
-        ax[i, j].imshow(image_rgb)
+        # assert np.allclose(events_array, events_folder)
+
+        image_rgb_array = viz_events(events_array[:num_events_plot], [H, W])
+        image_rgb_folder = viz_events(events_folder[:num_events_plot], [H, W])
+
+        matches += np.allclose(image_rgb_array, image_rgb_folder)
+        total += 1
+        print(np.linalg.norm(image_rgb_array - image_rgb_folder))
+
+        ax[i, j].imshow(image_rgb_array - image_rgb_folder)
         ax[i, j].axis('off')
         ax[i, j].set_title("Cp=%s Cn=%s" % (Cp, Cn))
 
 end = time.time()
 elapsed = end - start
 print(elapsed)
+
+print(f"Accuracy: {matches / total}")
 
 plt.show()

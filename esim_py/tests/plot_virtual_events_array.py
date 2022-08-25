@@ -11,6 +11,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import cv2
 import time
 
 
@@ -26,13 +27,13 @@ def viz_events(events, resolution):
 
     image_rgb = np.stack(
         [
-            image_pos.reshape(resolution), 
-            image_neg.reshape(resolution), 
-            np.zeros(resolution, dtype="uint8") 
+            image_pos.reshape(resolution),
+            image_neg.reshape(resolution),
+            np.zeros(resolution, dtype="uint8")
         ], -1
     ) * 50
 
-    return image_rgb    
+    return image_rgb
 
 
 Cp, Cn = 0.1, 0.1
@@ -45,13 +46,28 @@ image_folder = os.path.join(os.path.dirname(__file__), "data/images/images/")
 timestamps_file = os.path.join(os.path.dirname(__file__), "data/images/timestamps.txt")
 video_file = os.path.join(os.path.dirname(__file__), "data/video/video.avi")
 
-esim = esim_py.EventSimulator(Cp, 
-                              Cn, 
-                              refractory_period, 
-                              log_eps, 
+timestamps = np.array([float(x) for x in open(timestamps_file, "r").readlines()])
+
+n_samples = len(timestamps)
+
+# Read images into a list of numpy arrays
+images = []
+for i in range(n_samples):
+
+    image_file = os.path.join(image_folder, f"image_{i:05d}.png")
+    # Load image and convert to grayscale
+    image = cv2.imread(image_file, cv2.IMREAD_GRAYSCALE)
+
+    images.append(image)
+
+
+esim = esim_py.EventSimulator(Cp,
+                              Cn,
+                              refractory_period,
+                              log_eps,
                               use_log)
 
-fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(6,6))
+fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(6, 6))
 
 contrast_thresholds_pos = [0.1, 0.2, 0.3, 0.4, 0.5]
 contrast_thresholds_neg = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -63,8 +79,8 @@ start = time.time()
 for i, Cp in enumerate(contrast_thresholds_pos):
     for j, Cn in enumerate(contrast_thresholds_neg):
         esim.setParameters(Cp, Cn, refractory_period, log_eps, use_log)
-        events = esim.generateFromFolder(image_folder, timestamps_file)
-        
+        events = esim.generateFromArray(images, timestamps)
+
         image_rgb = viz_events(events[:num_events_plot], [H, W])
 
         ax[i, j].imshow(image_rgb)
